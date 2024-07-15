@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://vdo3.freckled.ai/IOAC_Assets/ioc/support_Files/confetti.js"></script>
+    <script src="https://vdo3.freckled.ai/IOAC_Assets/ioc/support_Files/konva.js"></script>
+    <script src="https://vdo3.freckled.ai/IOAC_Assets/ioc/support_Files/commonFunction.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'Comic Neue';
+            font-style: normal;
+            font-weight: 400;
+            src: url(https://fonts.gstatic.com/s/comicneue/v8/4UaHrEJDsxBrF37olUeD96rp5w.woff2) format('woff2');
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        input {
+            background-color: transparent;
+        }
+    </style>
+</head>
+
+<body>
+
+    <body onload="loadData()">
+        <div id="container"></div>
+        <input type="text" id="text" maxlength="1" autocomplete="off"></input>
+        <script>
+            var input = document.getElementById('text')
+            document.getElementById('text').style.color = "red"
+            document.getElementById('text').style.fontSize = "18px"
+
+            input.style.cssText = `
+          position : absolute;
+          visibility : hidden;
+          `
+            var stage = new Konva.Stage({
+                container: "container",
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+            var layer = new Konva.Layer()
+            var layer1 = new Konva.Layer();
+            var layer2 = new Konva.Layer();
+            var layer3 = new Konva.Layer();
+            stage.add(layer, layer1, layer2, layer3);
+            var bgImg, options;
+            var playbutton;
+            var numArr = [3, 0, 2];
+            var chkBoxImg = [];
+            var aud, d1;
+            var statuscount, optionsAud, completedcount;
+            var textaudio;
+            var sceneCount, image;
+            function loadData() {
+                window.addEventListener('message', handleMessage)
+            }
+            function handleMessage(event) {
+                gameObj = event.data;
+                score = gameObj.totalScore;
+                stage.width(gameObj.stageWidth);
+                stage.height(gameObj.stageHeight);
+                if (gameObj.recordingPath && gameObj.recordingPath !== undefined) {
+                    const objAssetId = gameObj.assetList.find((ele) => ele.className === "AnimationActivityProbAudio");
+                    Object.assign(gameObj.gameData[`qnArr${qnArrCount - 1}`][0].text, { audioPath: gameObj.recordingPath, recordingId: gameObj.recordingId });
+                    delete gameObj.recordingPath;
+                    delete gameObj.recordingId;
+                    delete gameObj.assetId;
+                }
+                if (gameObj.operation === "Load Data") {
+                    start()
+                }
+                else if (gameObj.operation === 'GameStart') {
+                    var startImg = startImage();
+                    layer1.add(startImg);
+                    startImg.on("click tap", () => {
+                        startImg.remove();
+                        Object.assign(gameObj, { operation: 'GameStart', gameStart: true })
+                        window.parent.postMessage({ dataObj: gameObj }, "*");
+                        start()
+                    });
+                }
+            }
+            function start() {
+                statuscount = gameObj.gameData.statusCount;
+                sceneCount = gameObj.gameData.sceneCount;
+                completedcount = gameObj.gameData.completedcount;
+                bgImg = bgImageLoader(gameObj.gameData.bgImage.image);
+                layer.add(bgImg);
+                if (statuscount == 0) {
+                    gameObj.gameData.gameStartPanel.map((d, i) => {
+                        if (d.image) {
+                            var gamestart = imageHandler(d.image, 0);
+                            layer1.add(gamestart);
+                        } else if (d.text) {
+                            textaudio = audioHandler(d.text.src, 0);
+                            textaudio.play();
+                        }
+                    })
+                    playbutton = imageHandler(gameObj.gameData.playBtn.image, 0);
+                    layer1.add(playbutton);
+                    playbutton.on('click tap', () => {
+                        textaudio.volume = 0;
+                        Object.assign(gameObj.gameData, { statusCount: 1 })
+                        gamePlay();
+                    })
+                } else if (statuscount == 1) {
+                    gamePlay();
+                } else {
+                    endGame();
+                }
+            }
+            function gamePlay() {
+                layer1.destroyChildren();
+                gameObj.gameData.gameplay.map((d, i) => {
+                    if (d.image) {
+                        var qnbg = imageHandler(d.image, 0);
+                        if (i < 2) {
+                            layer1.add(qnbg);
+                        }
+                    }
+                })
+                gameObj.gameData.gameplay[2].image.positionList.map((d, i) => {
+                    var d2 = imageHandler(gameObj.gameData.gameplay[2].image, i);
+                    layer1.add(d2);
+                })
+                var question = textHandler(gameObj.gameData.commonText.text, 0);
+                layer1.add(question);
+                var qnaudio = audioHandler(gameObj.gameData.commonText.text.src, 0);
+                qnaudio.play();
+                var nextbtn = imageHandler(gameObj.gameData.nextBtn.image, 0);
+                var submitBtn = imageHandler(gameObj.gameData.submitBtn.image, 0);
+                layer2.add(submitBtn);
+                submitBtn.hide();
+                var finishBtn = imageHandler(gameObj.gameData.finishBtn.image, 0);
+                layer2.add(finishBtn);
+                finishBtn.hide();
+                gameObj.gameData[`scene${sceneCount}`].map((d, i) => {
+                    image = imageHandler(d.image, 0);
+                    layer1.add(image)
+                    if (gameObj.gameData.submitBtn.status !== true) {
+                        gameObj.gameData.circle.image.positionList.map((d, i) => {
+                            var circle = imageHandler(gameObj.gameData.circle.image, i);
+                            layer3.add(circle);
+                        })
+                    }
+                    if (gameObj.gameData[`scene${sceneCount}`][0].status === true) {
+                        image.listening(false)
+                        if (gameObj.gameData.submitBtn.status === true) {
+                            var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                            layer2.add(tick1);
+                            var wrong4 = imageHandler(gameObj.gameData.wrongImg.image, 1);
+                            layer2.add(wrong4);
+                            if (sceneCount == 3) {
+                                nextbtn.remove()
+                                finishBtn.show()
+                            } else {
+                                submitBtn.remove();
+                                layer3.add(nextbtn);
+                            }
+                        } else {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 1);
+                            layer3.add(bc);
+                            submitBtn.show();
+                        }
+                    }
+                    if (gameObj.gameData[`scene${sceneCount}`][1].status === true) {
+                        image.listening(false)
+                        if (gameObj.gameData.submitBtn.status === true) {
+                            var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                            layer2.add(tick1);
+                            if (sceneCount == 3) {
+                                nextbtn.remove()
+                                finishBtn.show()
+                            } else {
+                                submitBtn.remove();
+                                layer3.add(nextbtn);
+                            }
+                        } else {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 2);
+                            layer3.add(bc);
+                            submitBtn.show();
+                        }
+                    }
+                    if (gameObj.gameData[`scene${sceneCount}`][2].status === true) {
+                        image.listening(false)
+                        if (gameObj.gameData.submitBtn.status === true) {
+                            var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                            layer2.add(tick1);
+                            var wrong4 = imageHandler(gameObj.gameData.wrongImg.image, 0);
+                            layer2.add(wrong4);
+                            if (sceneCount == 3) {
+                                nextbtn.remove()
+                                finishBtn.show()
+                            } else {
+                                submitBtn.remove();
+                                layer3.add(nextbtn);
+                            }
+                        } else {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 0);
+                            layer3.add(bc);
+                            submitBtn.show();
+                        }
+                    }
+                    image.on("click tap", () => {
+                        layer1.listening(false);
+                        if (i == 0) {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 1);
+                            layer3.add(bc);
+                            Object.assign(gameObj.gameData[`scene${sceneCount}`][0], { status: true })
+                        } else if (i == 1) {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 2);
+                            layer3.add(bc);
+                            Object.assign(gameObj.gameData[`scene${sceneCount}`][1], { status: true })
+                        } else {
+                            var bc = imageHandler(gameObj.gameData.blackcircle.image, 0);
+                            layer3.add(bc);
+                            Object.assign(gameObj.gameData[`scene${sceneCount}`][2], { status: true })
+                        }
+                        submitBtn.show();
+                    })
+                })
+                submitBtn.on("click tap", () => {
+                    layer3.destroyChildren()
+                    Object.assign(gameObj.gameData.submitBtn, { status: true })
+                    submitBtn.remove();
+                    layer2.add(nextbtn);
+                    if (gameObj.gameData[`scene${sceneCount}`][1].status === true) {
+                        var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                        layer2.add(tick1);
+                        completedcount++;
+                        Object.assign(gameObj.gameData, { completedcount: completedcount })
+                    } else if (gameObj.gameData[`scene${sceneCount}`][0].status === true) {
+                        var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                        layer2.add(tick1);
+                        var wrong4 = imageHandler(gameObj.gameData.wrongImg.image, 1);
+                        layer2.add(wrong4);
+                    } else {
+                        var tick1 = imageHandler(gameObj.gameData.tickImg.image, 0);
+                        layer2.add(tick1);
+                        var wrong4 = imageHandler(gameObj.gameData.wrongImg.image, 0);
+                        layer2.add(wrong4);
+                    }
+                    if (sceneCount == 3) {
+                        nextbtn.remove()
+                        finishBtn.show()
+                    }
+                })
+                var sound1 = audioHandler(gameObj.gameData[`sceneText${sceneCount}`][0].text.src, 0);
+                var sound2 = audioHandler(gameObj.gameData[`sceneText${sceneCount}`][1].text.src, 1);
+                var sound3 = audioHandler(gameObj.gameData[`sceneText${sceneCount}`][2].text.src, 2);
+                var sound4 = audioHandler(gameObj.gameData[`sceneText${sceneCount}`][3].text.src, 3);
+                var sound5 = audioHandler(gameObj.gameData[`sceneText${sceneCount}`][4].text.src, 4);
+                gameObj.gameData[`sceneText${sceneCount}`].map((d, i) => {
+                    var text = textHandler(d.text, 0);
+                    layer1.add(text);
+                    qnaudio.addEventListener("ended", () => {
+                        sound1.play();
+                        sound1.addEventListener("ended", () => {
+                            sound2.play();
+                            sound2.addEventListener("ended", () => {
+                                sound3.play();
+                                sound3.addEventListener("ended", () => {
+                                    sound4.play();
+                                    sound4.addEventListener("ended", () => {
+                                        sound5.play();
+                                    })
+                                })
+                            })
+                        })
+                    });
+                })
+                nextbtn.on("click tap", () => {
+                    layer3.destroyChildren();
+                    layer2.destroyChildren();
+                    sound1.volume = 0;
+                    sound2.volume = 0;
+                    sound3.volume = 0;
+                    sound4.volume = 0;
+                    sound5.volume = 0;
+                    Object.assign(gameObj.gameData.submitBtn, { status: false })
+                    nextbtn.hide();
+                    sceneCount++;
+                    Object.assign(gameObj.gameData, { sceneCount: sceneCount })
+                    Object.assign(gameObj.gameData, { completedcount: completedcount });
+                    Object.assign(gameObj, { totalScore: completedcount / 3 * 100 });
+                    layer1.listening(true);
+                    Object.assign(gameObj.gameData, { statusCount: 1 })
+                    gamePlay();
+                })
+                finishBtn.on("click tap", () => {
+                    sound1.volume = 0;
+                    sound2.volume = 0;
+                    sound3.volume = 0;
+                    sound4.volume = 0;
+                    sound5.volume = 0;
+                    Object.assign(gameObj.gameData, { statusCount: 2 });
+                    endGame();
+                })
+            }
+            function endGame() {
+                layer2.destroyChildren();
+                layer3.destroyChildren()
+                layer1.destroyChildren();
+                gameObj.gameData.gameEndPanel.map((d) => {
+                    if (d.image) {
+                        var endimg = imageHandler(d.image, 0);
+                        Object.assign(gameObj.gameData, { gameCompleted: true })
+                        Object.assign(gameObj.gameData, { completedcount: completedcount });
+                        Object.assign(gameObj, { totalScore: completedcount / 3 * 100 });
+                        layer2.add(endimg);
+                    }
+                    else if (d.text) {
+                        aud = audioHandler(d.text.src);
+                        aud.play();
+                    }
+                });
+            }
+            function imageHandler(data, i) {
+                var imgobj = new Image();
+                imgobj.src = data.src;
+                var wh = computeDimension(data.positionList[i].width, data.positionList[i].height);
+                var xy = computeDimension(data.positionList[i].x, data.positionList[i].y);
+                var image = new Konva.Image({
+                    image: imgobj,
+                    x: xy[0],
+                    y: xy[1],
+                    width: wh[0],
+                    height: wh[1]
+                });
+                return image;
+            }
+            function textHandler(txt, i) {
+                var wh = computeDimension(txt.positionList[i].width, txt.positionList[i].height);
+                var xy = computeDimension(txt.positionList[i].x, txt.positionList[i].y);
+                var fSize = computeDimension(txt.fontSize, 0);
+                var text = new Konva.Text({
+                    text: txt.text,
+                    x: xy[0],
+                    y: xy[1],
+                    width: wh[0],
+                    height: wh[1],
+                    fontSize: fSize[0],
+                    align: txt.textAlign,
+                    fontFamily: txt.fontFamily,
+                    fontStyle: txt.fontWeight,
+                    fill: txt.fill
+                });
+                return text;
+            }
+            function audioHandler(src, i) {
+                var audio = document.createElement("audio");
+                audio.src = src;
+                return audio;
+            }
+        </script>
+    </body>
+
+</html>
